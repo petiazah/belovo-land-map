@@ -103,7 +103,7 @@
     for(const f of CAD){if(!overlaps(f[2],vis))continue;lastCadVisible++;featurePath(f)}
     ctx.strokeStyle=zoom < .075?'rgba(35,69,86,.42)':'rgba(27,61,75,.65)';
     ctx.lineWidth=zoom>.7?1.08:.78;ctx.stroke();
-    if(zoom > .55 && lastCadVisible < 175){
+    if(byId('labels-toggle').checked && !byId('landuse-toggle').checked && zoom > .55 && lastCadVisible < 175){
       ctx.font='10px system-ui, sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';
       for(const f of CAD){if(!overlaps(f[2],vis) || f===selected)continue;
         const b=f[2],px=xPix((b[0]+b[2])/2),py=yPix((b[1]+b[3])/2);
@@ -242,6 +242,7 @@
       if(mode.value==='west')fit(sheets[0].b);else if(mode.value==='east')fit(sheets[1].b);else fit(total);
     });
     toggler.addEventListener('change',requestDraw);
+    byId('labels-toggle').addEventListener('change',requestDraw);
     satelliteToggle.addEventListener('change',()=>{
       // Contour pixels already contain transparency: keep full color contrast.
       // The opacity slider stays user-controlled in both modes.

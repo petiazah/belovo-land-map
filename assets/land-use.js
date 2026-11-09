@@ -11,13 +11,14 @@
     '#8b7618','#168d97','#bd617e','#567522','#7e588c','#2877be'
   ];
   const elem = id => document.getElementById(id);
-  const toggle = elem('landuse-toggle');
+  const toggle = elem('landuse-toggle'), labelsToggle = elem('labels-toggle');
   const ownerSelect = elem('owner-select'), massSelect = elem('mass-select');
   const status = elem('landuse-status'), detail = elem('mass-detail');
   const tooltip = elem('map-tooltip'), pane = elem('map-pane'), canvas = elem('map-canvas');
   const fmt = x => Number(x).toLocaleString('bg-BG',{maximumFractionDigits:2});
   const clean = s => String(s).replace(/"/g,'').trim();
-  let owners = [], masses = [], ready = false, hovered = null, selected = null, filter = -1;
+  let owners = [], masses = [], ready = false, hovered = null, hoveredFeature = null, selected = null, selectedParcel = null, filter = -1;
+  const labelAnchorCache = new WeakMap();
   let hitGeometry = [], missing = 0, matchCount = 0;
   let lastView = null, down = null;
   const byId = new Map(), byCad = new Map();
@@ -64,16 +65,19 @@
       for(const ring of f[3]) if(inRing(x,y,ring)) inside=!inside;
       if(inside && (!hit || Number(f[1]) < Number(hit.feature[1]))) hit=entry;
     }
-    return hit ? hit.mass : null;
+    return hit;
   }
-  function popup(m,x,y) {
-    if (!m) return;
+  function popup(entry,x,y) {
+    if (!entry) return;
+    const m=entry.mass, f=entry.feature;
     const name=clean(owners[m.ownerIndex]);
-    tooltip.innerHTML = '<strong>Масив № '+m.id+'</strong><div>'+escapeHTML(name)+
-      '</div><div>'+fmt(m.area)+' дка по регистъра</div>'+
-      '<small>Ориентировъчно местоположение · CAD 2016</small>';
+    tooltip.innerHTML = '<strong>Имот № '+escapeHTML(f[0])+'</strong>'+ 
+      '<div>Масив № '+m.id+'</div><div>'+escapeHTML(name)+'</div>'+ 
+      '<div>Площ на масива: '+fmt(m.area)+' дка</div>'+ 
+      '<div>CAD площ на имота: '+fmt(f[1])+' дка</div>'+ 
+      '<small>Имотът е по архивната CAD основа (2016 г.)</small>';
     tooltip.hidden=false;
-    const width=260,height=105;
+    const width=260,height=156;
     tooltip.style.left=(x+width+18>pane.clientWidth?Math.max(9,x-width-13):x+17)+'px';
     tooltip.style.top=(y+height+14>pane.clientHeight?Math.max(7,y-height-12):y+12)+'px';
   }
@@ -81,8 +85,8 @@
     '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
   }[c]));}
   function matchesFilter(m) {return filter===-1 || filter===m.ownerIndex;}
-  function choose(m,zoomTo) {
-    selected=m; hovered=null;
+  function choose(m,zoomTo,parcel=null) {
+    selected=m; selectedParcel=parcel; hovered=null; hoveredFeature=null;
     if(m && filter!==-1 && m.ownerIndex!==filter){
       filter=m.ownerIndex;ownerSelect.value=String(filter);refreshMassOptions();
     }
@@ -93,7 +97,8 @@
       const ids=m.parcelIds.length;
       detail.innerHTML='<strong>Масив № '+m.id+'</strong>'+
         '<p><b>'+escapeHTML(clean(owners[m.ownerIndex]))+'</b></p>'+
-        '<dl><dt>Площ по регистъра</dt><dd>'+fmt(m.area)+' дка</dd>'+
+        '<dl>'+(parcel?'<dt>Избран имот (CAD 2016)</dt><dd>№ '+escapeHTML(parcel[0])+'</dd>':'')+
+        '<dt>Площ по регистъра</dt><dd>'+fmt(m.area)+' дка</dd>'+
         '<dt>Имоти в регистъра</dt><dd>'+ids+'</dd>'+
         '<dt>Намерени в CAD 2016</dt><dd>'+m.features.length+' / '+ids+'</dd></dl>'+
         (m.bounds?'<p class="approx-note">Контурите са ориентировъчни, по архивна CAD основа от 2016 г.</p>':
@@ -184,6 +189,69 @@
     ctx.fillStyle='#183645';ctx.textAlign='center';ctx.textBaseline='middle';
     ctx.fillText(title,x,y,Math.max(14,width-12));ctx.restore();
   }
+
+  function isInsideFeature(x,y,f) {
+    let inside=false;
+    for(const ring of f[3]) if(ring.length>=3 && inRing(x,y,ring)) inside=!inside;
+    return inside;
+  }
+  function labelAnchor(f) {
+    if(labelAnchorCache.has(f))return labelAnchorCache.get(f);
+    const b=f[2],width=b[2]-b[0],height=b[3]-b[1];
+    // The bounding box center may be outside an irregular cadastral parcel.
+    // Try interior candidates before placing a text label.
+    let result=null;
+    const fractions=[.5,.4,.6,.3,.7,.2,.8,.1,.9];
+    for(const fy of fractions){
+      for(const fx of fractions){
+        const x=b[0]+fx*width,y=b[1]+fy*height;
+        if(isInsideFeature(x,y,f)){result=[x,y];break;}
+      }
+      if(result)break;
+    }
+    labelAnchorCache.set(f,result);
+    return result;
+  }
+  function parcelLabels(ctx,view,visible,usedBoxes) {
+    if(!labelsToggle.checked || view.zoom<.48)return;
+    const eligible=hitGeometry.filter(({feature:f,mass:m})=>
+      matchesFilter(m)&&intersects(f[2],visible));
+    eligible.sort((a,b)=>
+      (b.feature===selectedParcel)-(a.feature===selectedParcel) ||
+      Number(b.feature[1])-Number(a.feature[1]));
+    const maxLabels=view.zoom<.9?90:view.zoom<1.7?150:260;
+    let placed=0;
+    ctx.save();
+    ctx.textAlign='center';ctx.textBaseline='middle';
+    for(const entry of eligible) {
+      if(placed>=maxLabels)break;
+      const f=entry.feature,m=entry.mass;
+      const b=f[2];
+      const sw=(b[2]-b[0])*view.zoom, sh=(b[3]-b[1])*view.zoom;
+      if(f!==selectedParcel && Math.max(sw,sh)<23)continue;
+      const pt=labelAnchor(f);
+      if(!pt)continue;
+      const x=(pt[0]-view.cx)*view.zoom+view.w/2;
+      const y=(view.cy-pt[1])*view.zoom+view.h/2;
+      if(x<18||x>view.w-18||y<12||y>view.h-12)continue;
+      const title='Имот '+String(f[0]);
+      ctx.font=(f===selectedParcel?'bold 11px':'600 10px')+' system-ui, sans-serif';
+      const width=Math.min(140,Math.ceil(ctx.measureText(title).width)+12);
+      const box=[x-width/2,y-9,x+width/2,y+9];
+      if(f!==selectedParcel &&
+        usedBoxes.some(a=>!(a[2]+3<box[0]||a[0]-3>box[2]||a[3]+3<box[1]||a[1]-3>box[3])))continue;
+      usedBoxes.push(box);
+      ctx.fillStyle=f===selectedParcel?'#fff0d9':'rgba(255,255,255,.83)';
+      ctx.strokeStyle=colors[m.ownerIndex%colors.length];
+      ctx.lineWidth=f===selectedParcel?1.6:.7;
+      ctx.beginPath();ctx.roundRect(box[0],box[1],width,18,4);
+      ctx.fill();ctx.stroke();
+      ctx.fillStyle='#153648';
+      ctx.fillText(title,x,y,Math.max(16,width-8));
+      placed++;
+    }
+    ctx.restore();
+  }
   function draw(ctx,view,redraw) {
     window.BELOVO_REDRAW=redraw;
     lastView=view;
@@ -223,6 +291,7 @@
       if(compact)counts.set(m.ownerIndex,n+1);
       label(ctx,view,m,!compact||filter!==-1,boxes);
     }
+    parcelLabels(ctx,view,visible,boxes);
   }
   function pointerCoord(event) {
     if(!lastView)return null;
@@ -236,24 +305,26 @@
   pane.addEventListener('pointermove',e=>{
     if(!ready||!toggle.checked||e.buttons)return;
     const p=pointerCoord(e);
-    const m=p?pick(p.x,p.y):null;
-    if(hovered!==m){hovered=m;window.BELOVO_REDRAW?.();}
-    if(m)popup(m,p.px,p.py);
-    else if(hovered===null&&!elem('cad-toggle').checked)tooltip.hidden=true;
+    const entry=p?pick(p.x,p.y):null;
+    const m=entry?.mass||null, f=entry?.feature||null;
+    if(hovered!==m || hoveredFeature!==f){hovered=m;hoveredFeature=f;window.BELOVO_REDRAW?.();}
+    if(entry)popup(entry,p.px,p.py);
+    else tooltip.hidden=true;
   });
   pane.addEventListener('pointerup',e=>{
     if(!down)return;
     const dist=Math.hypot(e.clientX-down.x,e.clientY-down.y);down=null;
     if(!ready||!toggle.checked||dist>7)return;
     const p=pointerCoord(e);if(!p)return;
-    const m=pick(p.x,p.y);
-    if(m)choose(m,false);
+    const entry=pick(p.x,p.y);
+    if(entry)choose(entry.mass,false,entry.feature);
   });
   pane.addEventListener('pointercancel',()=>{down=null;});
   pane.addEventListener('pointerleave',()=>{
-    if(hovered){hovered=null;window.BELOVO_REDRAW?.();}
+    if(hovered||hoveredFeature){hovered=null;hoveredFeature=null;window.BELOVO_REDRAW?.();}
   });
-  toggle.addEventListener('change',()=>{hovered=null;window.BELOVO_REDRAW?.();});
+  toggle.addEventListener('change',()=>{hovered=null;hoveredFeature=null;tooltip.hidden=true;window.BELOVO_REDRAW?.();});
+  labelsToggle.addEventListener('change',()=>window.BELOVO_REDRAW?.());
   ownerSelect.addEventListener('change',()=>{
     filter=Number(ownerSelect.value);
     selected=null;refreshMassOptions();choose(null,false);
