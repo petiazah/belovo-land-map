@@ -10,6 +10,7 @@
   <script defer src="data/cad-2016.js"></script>
   <script defer src="assets/satellite.js"></script>
   <script defer src="assets/contours.js"></script>
+  <script defer src="assets/land-use.js"></script>
   <script defer src="assets/app.js"></script>
 </head>
 <body>
@@ -37,6 +38,7 @@
           <label class="field-label" for="sheet-select">Работна карта 2026/2027</label>
           <select id="sheet-select"><option value="both">Обединена карта 1 + карта 2</option><option value="west">Карта 1 · западна част</option><option value="east">Карта 2 · източна част</option></select>
           <label class="toggle-row"><input type="checkbox" id="satellite-toggle"><span class="switch" aria-hidden="true"></span><span class="toggle-text"><b>Сателитна подложка</b><small>Esri World Imagery · работните карти се показват без бял фон</small></span></label>
+          <label class="toggle-row"><input type="checkbox" id="landuse-toggle" checked><span class="switch" aria-hidden="true"></span><span class="toggle-text"><b>Ползватели по споразумението</b><small>2026/2027 · надписи и цветни контури</small></span></label>
           <label class="toggle-row"><input type="checkbox" id="cad-toggle"><span class="switch" aria-hidden="true"></span><span class="toggle-text"><b>Кадастрални контури</b><small>Справочен CAD слой · 2016 г.</small></span></label>
           <label class="toggle-row disabled-toggle" id="labels-row"><input type="checkbox" id="labels-toggle" checked disabled><span class="switch" aria-hidden="true"></span><span class="toggle-text"><b>Номера на имотите</b><small>Показват се при приближаване</small></span></label>
           <label class="field-label range-label" for="opacity-range">Прозрачност на работните карти <output id="opacity-label">100%</output></label>
@@ -44,8 +46,19 @@
           <div class="chip-row"><button type="button" id="fit-maps" class="btn btn-primary">Обхват на картите</button><button type="button" id="fit-cad" class="btn btn-secondary">Цяло землище</button></div>
         </section>
 
+        <section class="sidebar-section" aria-labelledby="landuse-h">
+          <div class="section-title" id="landuse-h"><span class="section-index">02</span><h2>Ползватели и масиви</h2></div>
+          <label class="field-label" for="owner-select">Ползвател по споразумението</label>
+          <select id="owner-select"><option value="-1">Зареждане на ползвателите…</option></select>
+          <label class="field-label" for="mass-select" style="margin-top:15px">Масив №</label>
+          <select id="mass-select"><option value="">Избери масив</option></select>
+          <p class="helper-text" id="landuse-status">Зареждане на регистъра за 2026/2027 г.…</p>
+          <div class="detail-card mass-user-detail" id="mass-detail" aria-live="polite"><strong>Избери масив</strong><p>Натисни върху цветните контури на картата или избери номер на масив.</p></div>
+          <div class="source-note"><strong>Точност на слоя</strong>Ползвателят и номерът на масива са от регистъра по чл. 74 за 2026/2027 г. Оцветената геометрия е ориентировъчна — по съвпаднали имоти от архивната CAD основа (2016 г.), а не официални граници на масивите.</div>
+        </section>
+
         <section class="sidebar-section" aria-labelledby="search-h">
-          <div class="section-title" id="search-h"><span class="section-index">02</span><h2>Търсене на имот</h2></div>
+          <div class="section-title" id="search-h"><span class="section-index">03</span><h2>Търсене на имот</h2></div>
           <label class="field-label" for="parcel-search">Номер от CAD основа (2016 г.)</label>
           <div class="search-row"><input id="parcel-search" type="search" autocomplete="off" spellcheck="false" placeholder="Напр. 8.169"><button type="button" class="search-button" id="search-button" aria-label="Търси">⌕</button></div>
           <div id="suggestions" class="suggestions" role="listbox" hidden></div>
@@ -54,7 +67,8 @@
         </section>
 
         <section class="sidebar-section" aria-labelledby="legend-h">
-          <div class="section-title" id="legend-h"><span class="section-index">03</span><h2>Легенда и източници</h2></div>
+          <div class="section-title" id="legend-h"><span class="section-index">04</span><h2>Легенда и източници</h2></div>
+          <div class="legend-line"><span class="legend-swatch landuse-swatch"></span> Ползватели от регистъра 2026/2027 (приблизително)</div>
           <div class="legend-line"><span class="legend-swatch satellite-swatch"></span> Сателитни изображения · Esri World Imagery</div>
           <div class="legend-line"><span class="legend-swatch raster-swatch"></span> Цветно разпределение от PDF картите (2026/2027)</div>
           <div class="legend-line"><span class="legend-swatch cad-swatch"></span> Архивни контури от CAD (2016)</div>

@@ -138,6 +138,7 @@
     if(mode.value==='both'){drawSheet(sheets[0],sheets[0].b[0],seam);drawSheet(sheets[1],seam,sheets[1].b[2]);}
     else {const sheet=sheets.find(s=>s.id===mode.value);if(sheet)drawSheet(sheet,sheet.b[0],sheet.b[2]);}
     drawCAD();
+    if(window.BELOVO_LAND_USE) window.BELOVO_LAND_USE.draw(ctx,{cx,cy,zoom,w,h},requestDraw);
     if(hovered && hovered!==selected && toggler.checked)highlightFeature(hovered,true);
     if(selected && toggler.checked)highlightFeature(selected,false);
     updateScale();
@@ -276,7 +277,8 @@
       }
       if(!toggler.checked){if(hovered){hovered=null;tooltip.hidden=true;requestDraw()}return}
       const next=pickMap(xMap(px),yMap(py));if(next!==hovered){hovered=next;requestDraw()}
-      if(next)displayTooltip(next,px,py);else tooltip.hidden=true;
+      // The land-use layer owns the hover popup while enabled.
+      if(!byId('landuse-toggle')?.checked){if(next)displayTooltip(next,px,py);else tooltip.hidden=true;}
     });
     pane.addEventListener('pointerup',e=>{
       if(!drag)return;pane.classList.remove('dragging');
@@ -312,6 +314,10 @@
       img.addEventListener('load',()=>done(true),{once:true});img.addEventListener('error',()=>done(false),{once:true});img.src=tile.src;
     }
   }
+  // Small, read-only map hooks for the separately maintained land-use layer.
+  window.BELOVO_FOCUS = focus;
+  window.BELOVO_FIT = fit;
+  window.BELOVO_REDRAW = requestDraw;
   initControls();initPointer();resize();if(!restore())fit(total);
   if(satelliteToggle.checked)byId('map-attribution').textContent='Esri World Imagery · Esri, Vantor, Earthstar Geographics, GIS User Community · PDF контури 2026/2027 · CAD 2016';
   initImages();

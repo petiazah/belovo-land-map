@@ -13,3 +13,15 @@
 @media(max-width:380px){.map-heading-sub{display:none}.map-heading{max-width:225px}.map-status{top:58px}.map-scale{gap:5px}.scale-label{display:none}}
 .satellite-swatch{background:linear-gradient(135deg,#57704e 0%,#8d9260 25%,#3c5d50 48%,#b4a17e 73%,#56718a 100%)}
 .map-attribution{max-width:min(52vw,540px);text-align:right;background:#ffffffe0;border-radius:4px;padding:3px 5px;line-height:1.35}
+
+/* Registered land users: keep the selected owner visible and legible. */
+.landuse-swatch{background:linear-gradient(115deg,#0b83b7 0%,#bb4d94 40%,#db6c20 70%,#29845b 100%)}
+#landuse-status{margin-bottom:12px}
+#landuse-status.error{color:#b73f35;font-weight:650}
+.mass-user-detail{display:block;padding:13px 14px;min-height:72px}
+.mass-user-detail strong{display:block;font-size:13px;color:#164253}
+.mass-user-detail p{font-size:12px;line-height:1.55;color:#456473;margin:9px 0}
+.mass-user-detail dl{display:grid;grid-template-columns:1fr auto;gap:7px 10px;font-size:11px;margin:10px 0}
+.mass-user-detail dt{color:#708894}
+.mass-user-detail dd{margin:0;text-align:right;font-weight:750;color:#285064}
+.mass-user-detail .approx-note{padding-top:7px;border-top:1px solid #dae6eb;color:#886947;font-size:10px}
