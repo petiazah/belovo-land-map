@@ -15,7 +15,6 @@
   const canvas = byId('map-canvas'), pane = byId('map-pane'), ctx = canvas.getContext('2d', {alpha:false});
   const toggler = byId('cad-toggle'), mode = byId('sheet-select'), opacity = byId('opacity-range');
   const satelliteToggle = byId('satellite-toggle'), satellite = window.BELOVO_SATELLITE;
-  let opacityBeforeSatellite = null;
   const search = byId('parcel-search'), suggestions = byId('suggestions'), tooltip = byId('map-tooltip');
   const detail = byId('detail-card'), status = byId('map-status'), loading = byId('loading-overlay');
   const fmt = n => Number(n).toLocaleString('bg-BG',{maximumFractionDigits:2});
@@ -83,7 +82,10 @@
       const x1=b[0]+(t.c+1)/TILE_COLS*(b[2]-b[0]);
       const yTop=b[3]-t.r/TILE_ROWS*(b[3]-b[1]);
       const yBottom=b[3]-(t.r+1)/TILE_ROWS*(b[3]-b[1]);
-      ctx.drawImage(t.img,xPix(x0),yPix(yTop),(x1-x0)*zoom,(yTop-yBottom)*zoom);
+      // The satellite view uses a transparent, color-only mask instead of the
+      // original PDF pixels. No white paper rectangle is drawn over the terrain.
+      const picture = satelliteToggle.checked ? t.contours : t.img;
+      if(picture)ctx.drawImage(picture,xPix(x0),yPix(yTop),(x1-x0)*zoom,(yTop-yBottom)*zoom);
     }
     ctx.restore();
   }
@@ -212,7 +214,7 @@
       if(Number.isFinite(x)&&Number.isFinite(y)&&Number.isFinite(z)&&z>=minZoom&&z<=maxZoom){cx=x;cy=y;zoom=z}else return false;
       const m=p.get('sheet');if(['both','west','east'].includes(m))mode.value=m;
       toggler.checked=p.get('cad')==='1';satelliteToggle.checked=p.get('satellite')==='1';const a=Number(p.get('opacity'));if(a>=15&&a<=100)opacity.value=a;
-      if(satelliteToggle.checked&&Number(opacity.value)>75){opacityBeforeSatellite=Number(opacity.value);opacity.value='60';}
+
       byId('opacity-label').textContent=opacity.value+'%';
       const id=p.get('parcel');if(id){const f=CAD.find(c=>c[0]===id);if(f)selectFeature(f,false)}
       return true;
@@ -240,13 +242,12 @@
     });
     toggler.addEventListener('change',requestDraw);
     satelliteToggle.addEventListener('change',()=>{
-      if(satelliteToggle.checked){if(Number(opacity.value)>75){opacityBeforeSatellite=Number(opacity.value);opacity.value='60';}}
-      else if(opacityBeforeSatellite!==null){opacity.value=String(opacityBeforeSatellite);opacityBeforeSatellite=null;}
-      byId('opacity-label').textContent=opacity.value+'%';
-      byId('map-attribution').textContent=satelliteToggle.checked?'Esri World Imagery · Esri, Vantor, Earthstar Geographics, GIS User Community · PDF 2026/2027 · CAD 2016':'PDF: 2026/2027 · CAD: 2016 · справочен преглед';
+      // Contour pixels already contain transparency: keep full color contrast.
+      // The opacity slider stays user-controlled in both modes.
+      byId('map-attribution').textContent=satelliteToggle.checked?'Esri World Imagery · Esri, Vantor, Earthstar Geographics, GIS User Community · PDF контури 2026/2027 · CAD 2016':'PDF: 2026/2027 · CAD: 2016 · справочен преглед';
       requestDraw();
     });
-    opacity.addEventListener('input',()=>{opacityBeforeSatellite=null;byId('opacity-label').textContent=opacity.value+'%';requestDraw()});
+    opacity.addEventListener('input',()=>{byId('opacity-label').textContent=opacity.value+'%';requestDraw()});
     search.addEventListener('input',updateSuggestions);
     search.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();findFeature()}else if(e.key==='Escape')suggestions.hidden=true});
     byId('search-button').addEventListener('click',findFeature);
@@ -294,6 +295,13 @@
     for(const tile of tiles){
       const img=new Image();tile.img=img;
       const done=ok=>{
+        if(ok && window.BELOVO_CONTOURS) {
+          try {tile.contours = window.BELOVO_CONTOURS.create(img);}
+          catch(err) {
+            console.error('Unable to prepare transparent map contours:', err);
+            // Avoid drawing the opaque PDF sheet on top of satellite imagery.
+          }
+        }
         loaded++;if(!ok)failed++;
         if(loaded===tiles.length){
           ready=true;loading.classList.add('hidden');window.setTimeout(()=>loading.hidden=true,350);
@@ -305,7 +313,7 @@
     }
   }
   initControls();initPointer();resize();if(!restore())fit(total);
-  if(satelliteToggle.checked)byId('map-attribution').textContent='Esri World Imagery · Esri, Vantor, Earthstar Geographics, GIS User Community · PDF 2026/2027 · CAD 2016';
+  if(satelliteToggle.checked)byId('map-attribution').textContent='Esri World Imagery · Esri, Vantor, Earthstar Geographics, GIS User Community · PDF контури 2026/2027 · CAD 2016';
   initImages();
   window.addEventListener('resize',resize);if(window.ResizeObserver)new ResizeObserver(resize).observe(pane);
 })();

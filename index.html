@@ -9,6 +9,7 @@
   <link rel="stylesheet" href="assets/styles.css">
   <script defer src="data/cad-2016.js"></script>
   <script defer src="assets/satellite.js"></script>
+  <script defer src="assets/contours.js"></script>
   <script defer src="assets/app.js"></script>
 </head>
 <body>
@@ -35,7 +36,7 @@
           <div class="section-title" id="layers-h"><span class="section-index">01</span><h2>Картни слоеве</h2></div>
           <label class="field-label" for="sheet-select">Работна карта 2026/2027</label>
           <select id="sheet-select"><option value="both">Обединена карта 1 + карта 2</option><option value="west">Карта 1 · западна част</option><option value="east">Карта 2 · източна част</option></select>
-          <label class="toggle-row"><input type="checkbox" id="satellite-toggle"><span class="switch" aria-hidden="true"></span><span class="toggle-text"><b>Сателитна подложка</b><small>Esri World Imagery · включване / изключване</small></span></label>
+          <label class="toggle-row"><input type="checkbox" id="satellite-toggle"><span class="switch" aria-hidden="true"></span><span class="toggle-text"><b>Сателитна подложка</b><small>Esri World Imagery · работните карти се показват без бял фон</small></span></label>
           <label class="toggle-row"><input type="checkbox" id="cad-toggle"><span class="switch" aria-hidden="true"></span><span class="toggle-text"><b>Кадастрални контури</b><small>Справочен CAD слой · 2016 г.</small></span></label>
           <label class="toggle-row disabled-toggle" id="labels-row"><input type="checkbox" id="labels-toggle" checked disabled><span class="switch" aria-hidden="true"></span><span class="toggle-text"><b>Номера на имотите</b><small>Показват се при приближаване</small></span></label>
           <label class="field-label range-label" for="opacity-range">Прозрачност на работните карти <output id="opacity-label">100%</output></label>
