@@ -103,8 +103,10 @@
     const vis=visibleBounds();lastCadVisible=0;
     ctx.save(); ctx.beginPath();
     for(const f of CAD){if(!overlaps(f[2],vis))continue;lastCadVisible++;featurePath(f)}
-    ctx.strokeStyle=zoom < .075?'rgba(35,69,86,.42)':'rgba(27,61,75,.65)';
-    ctx.lineWidth=zoom>.7?1.08:.78;ctx.stroke();
+    // Historic CAD boundaries are a separate optional reference layer.
+    ctx.strokeStyle=zoom < .075?'rgba(18,86,115,.70)':'rgba(12,80,108,.93)';
+    ctx.lineJoin='round';
+    ctx.lineWidth=zoom>.7?1.6:1.2;ctx.stroke();
     ctx.restore();
   }
   function highlightFeature(f,isHover){

@@ -6,9 +6,10 @@
   'use strict';
   const CAD = Array.isArray(window.BELOVO_CAD) ? window.BELOVO_CAD : [];
   const cadIndex = new Map(CAD.map(f => [String(f[0]), f]));
+  // Saturated, contrasting colors remain legible over variable satellite terrain.
   const colors = [
-    '#0b83b7','#bb4d94','#db6c20','#5a6dcb','#29845b','#b45150','#7360ab',
-    '#8b7618','#168d97','#bd617e','#567522','#7e588c','#2877be'
+    '#008de3','#d92d9a','#f07516','#555df0','#00a875','#e74c3c','#9251df',
+    '#b99706','#00a5bb','#dc3a77','#6a9912','#a342bd','#146cdb'
   ];
   const elem = id => document.getElementById(id);
   const toggle = elem('landuse-toggle');
@@ -171,18 +172,23 @@
     const visible=[view.cx-view.w/(view.zoom*2),view.cy-view.h/(view.zoom*2),
       view.cx+view.w/(view.zoom*2),view.cy+view.h/(view.zoom*2)];
     const visibleMasses=masses.filter(m=>m.bounds && matchesFilter(m)&&intersects(m.bounds,visible));
-    // Transparent owner colors on matched historic parcels; not official massif boundaries.
+    // Stronger colored outlines with restrained transparent fills.
+    // Geometry remains an approximate match to historic CAD parcels, not legal massif bounds.
     ctx.save();
+    ctx.lineJoin='round';
+    ctx.lineCap='round';
     for(const m of visibleMasses) {
       const important=m===selected||m===hovered;
+      const color=colors[m.ownerIndex%colors.length];
       for(const f of m.features) {
         if(!intersects(f[2],visible)) continue;
         ctx.beginPath();featurePath(ctx,f,view);
-        ctx.globalAlpha=important?.24:.095;
-        ctx.fillStyle=colors[m.ownerIndex%colors.length];ctx.fill('evenodd');
-        ctx.globalAlpha=important?1:.72;
-        ctx.strokeStyle=colors[m.ownerIndex%colors.length];
-        ctx.lineWidth=important?2.3:Math.max(.7,Math.min(1.2,view.zoom*3));
+        ctx.fillStyle=color;
+        ctx.globalAlpha=important?.28:.16;
+        ctx.fill('evenodd');
+        ctx.globalAlpha=1;
+        ctx.strokeStyle=color;
+        ctx.lineWidth=important?3.2:Math.max(1.35,Math.min(2.25,1.15+view.zoom*2.3));
         ctx.stroke();
       }
     }
