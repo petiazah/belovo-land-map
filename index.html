@@ -6,12 +6,11 @@
   <meta name="theme-color" content="#0d2734">
   <meta name="description" content="Интерактивна справочна карта на масивите за ползване в землището на гр. Белово (ЕКАТТЕ 03592), стопанска 2026/2027 г.">
   <title>Карта на масивите · Белово 03592</title>
-  <link rel="stylesheet" href="assets/styles.css">
+  <link rel="stylesheet" href="assets/styles.css?v=clean-20261109">
   <script defer src="data/cad-2016.js"></script>
-  <script defer src="assets/satellite.js"></script>
-  <script defer src="assets/contours.js"></script>
-  <script defer src="assets/land-use.js"></script>
-  <script defer src="assets/app.js"></script>
+  <script defer src="assets/satellite.js?v=clean-20261109"></script>
+  <script defer src="assets/land-use.js?v=clean-20261109"></script>
+  <script defer src="assets/app.js?v=clean-20261109"></script>
 </head>
 <body>
   <div class="app-shell">
@@ -37,8 +36,8 @@
           <div class="section-title" id="layers-h"><span class="section-index">01</span><h2>Картни слоеве</h2></div>
           <label class="field-label" for="sheet-select">Работна карта 2026/2027</label>
           <select id="sheet-select"><option value="both">Обединена карта 1 + карта 2</option><option value="west">Карта 1 · западна част</option><option value="east">Карта 2 · източна част</option></select>
-          <label class="toggle-row"><input type="checkbox" id="satellite-toggle"><span class="switch" aria-hidden="true"></span><span class="toggle-text"><b>Сателитна подложка</b><small>Esri World Imagery · чист изглед без печатни надписи</small></span></label>
-          <label class="toggle-row" id="pdf-overlay-row"><input type="checkbox" id="pdf-overlay-toggle" checked><span class="switch" aria-hidden="true"></span><span class="toggle-text"><b>Оригинални PDF карти (с надписи)</b><small>Изключени при сателитен изглед; включи за сравнение с изходните листове</small></span></label>
+          <label class="toggle-row"><input type="checkbox" id="satellite-toggle" checked><span class="switch" aria-hidden="true"></span><span class="toggle-text"><b>Сателитна подложка</b><small>Esri World Imagery · само цветни векторни контури, без печатен PDF</small></span></label>
+          <label class="toggle-row" id="pdf-overlay-row"><input type="checkbox" id="pdf-overlay-toggle" disabled><span class="switch" aria-hidden="true"></span><span class="toggle-text"><b>Оригинални PDF карти (с надписи)</b><small>Достъпни само при изключена сателитна подложка</small></span></label>
           <label class="toggle-row"><input type="checkbox" id="landuse-toggle" checked><span class="switch" aria-hidden="true"></span><span class="toggle-text"><b>Ползватели по споразумението</b><small>2026/2027 · цветни контури и информация при посочване</small></span></label>
           <label class="toggle-row"><input type="checkbox" id="cad-toggle"><span class="switch" aria-hidden="true"></span><span class="toggle-text"><b>Кадастрални контури</b><small>Справочен CAD слой · 2016 г.</small></span></label>
           <p class="helper-text">Посочи оцветен имот на картата, за да видиш номер на масив, ползвател, площ и номер на имота (CAD 2016). Щракни за подробности.</p>

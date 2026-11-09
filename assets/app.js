@@ -85,8 +85,9 @@
       const yBottom=b[3]-(t.r+1)/TILE_ROWS*(b[3]-b[1]);
       // The satellite view uses a transparent, color-only mask instead of the
       // original PDF pixels. No white paper rectangle is drawn over the terrain.
-      const picture = satelliteToggle.checked ? t.contours : t.img;
-      if(picture)ctx.drawImage(picture,xPix(x0),yPix(yTop),(x1-x0)*zoom,(yTop-yBottom)*zoom);
+      // Original PDF raster is only used without satellite imagery.
+      // It contains baked-in magenta/cyan labels; never composite it over satellite.
+      ctx.drawImage(t.img,xPix(x0),yPix(yTop),(x1-x0)*zoom,(yTop-yBottom)*zoom);
     }
     ctx.restore();
   }
@@ -132,7 +133,9 @@
     // PDF raster contains embedded place labels. For a genuinely text-free view,
     // hide that raster entirely while keeping independently drawn cadastral/user outlines.
     // Do NOT infer new 2026/2027 massif boundaries from the historic CAD outlines.
-    if(pdfOverlayToggle.checked){
+    // Hard rule: the satellite mode must never paint the original PDF raster,
+    // even if an old shared link or browser cache has pdf=1.
+    if(!satelliteToggle.checked && pdfOverlayToggle.checked){
       if(mode.value==='both'){drawSheet(sheets[0],sheets[0].b[0],seam);drawSheet(sheets[1],seam,sheets[1].b[2]);}
       else {const sheet=sheets.find(s=>s.id===mode.value);if(sheet)drawSheet(sheet,sheet.b[0],sheet.b[2]);}
     }
@@ -142,9 +145,9 @@
     if(selected && toggler.checked)highlightFeature(selected,false);
     updateScale();
     if(ready){
-      status.textContent=pdfOverlayToggle.checked
-        ? (toggler.checked?`${fmt(lastCadVisible)} контура в изгледа · CAD 2016`:'Работни карти 2026/2027')
-        : 'Без PDF надписи · контури по CAD 2016 / регистър 2026/2027';
+      status.textContent=!satelliteToggle.checked && pdfOverlayToggle.checked
+        ? (toggler.checked?`${fmt(lastCadVisible)} контура в изгледа · CAD 2016`:'Оригинални PDF карти 2026/2027')
+        : 'Чист изглед · векторни контури по CAD 2016 / регистър 2026/2027';
       status.classList.add('ready');
     }
   }
@@ -210,7 +213,7 @@
     const p=new URLSearchParams();p.set('x',Math.round(cx));p.set('y',Math.round(cy));p.set('s',zoom.toFixed(4));
     p.set('sheet',mode.value);p.set('cad',toggler.checked?'1':'0');p.set('opacity',opacity.value);
     p.set('satellite',satelliteToggle.checked?'1':'0');
-    p.set('pdf',pdfOverlayToggle.checked?'1':'0');
+    p.set('pdf',!satelliteToggle.checked && pdfOverlayToggle.checked?'1':'0');
     if(selected)p.set('parcel',selected[0]);return p.toString();
   }
   function restore(){
@@ -220,7 +223,7 @@
       if(Number.isFinite(x)&&Number.isFinite(y)&&Number.isFinite(z)&&z>=minZoom&&z<=maxZoom){cx=x;cy=y;zoom=z}else return false;
       const m=p.get('sheet');if(['both','west','east'].includes(m))mode.value=m;
       toggler.checked=p.get('cad')==='1';satelliteToggle.checked=p.get('satellite')==='1';
-      pdfOverlayToggle.checked=p.has('pdf') ? p.get('pdf')==='1' : !satelliteToggle.checked;
+      pdfOverlayToggle.checked=!satelliteToggle.checked && (p.has('pdf') ? p.get('pdf')==='1' : true);
       syncPdfOverlayUI();
       const a=Number(p.get('opacity'));if(a>=15&&a<=100)opacity.value=a;
 
@@ -241,10 +244,13 @@
   }
   function closeMobile(){byId('app-body').classList.remove('sidebar-open');byId('mobile-menu').setAttribute('aria-expanded','false')}
   function syncPdfOverlayUI(){
-    opacity.disabled=!pdfOverlayToggle.checked;
+    // Enforce consistent state on initial load, hash restoration and mode switches.
+    if(satelliteToggle.checked)pdfOverlayToggle.checked=false;
+    pdfOverlayToggle.disabled=satelliteToggle.checked;
+    opacity.disabled=satelliteToggle.checked || !pdfOverlayToggle.checked;
     byId('pdf-overlay-row').title=pdfOverlayToggle.checked
-      ? 'Включени са оригиналните PDF листове, които съдържат надписи'
-      : 'Печатните надписи са скрити, защото PDF листовете не се рисуват';
+      ? 'Оригиналните PDF листове съдържат печатни надписи'
+      : 'На сателитен режим PDF листовете винаги са скрити. Показват се само векторни контури';
     byId('map-attribution').textContent=satelliteToggle.checked
       ? (pdfOverlayToggle.checked
         ? 'Esri World Imagery · Esri, Vantor, Earthstar Geographics, GIS User Community · PDF листове 2026/2027 (с текст) · CAD 2016'
@@ -271,6 +277,8 @@
       requestDraw();
     });
     pdfOverlayToggle.addEventListener('change',()=>{
+      // A PDF cannot be overlaid on satellite imagery in clean-label mode.
+      if(satelliteToggle.checked)pdfOverlayToggle.checked=false;
       syncPdfOverlayUI();
       requestDraw();
     });
@@ -325,13 +333,8 @@
     for(const tile of tiles){
       const img=new Image();tile.img=img;
       const done=ok=>{
-        if(ok && window.BELOVO_CONTOURS) {
-          try {tile.contours = window.BELOVO_CONTOURS.create(img);}
-          catch(err) {
-            console.error('Unable to prepare transparent map contours:', err);
-            // Avoid drawing the opaque PDF sheet on top of satellite imagery.
-          }
-        }
+        // The source images remain available for inspection only in non-satellite mode.
+        // No color-filtered raster is generated; that was preserving embedded text.
         loaded++;if(!ok)failed++;
         if(loaded===tiles.length){
           ready=true;loading.classList.add('hidden');window.setTimeout(()=>loading.hidden=true,350);
