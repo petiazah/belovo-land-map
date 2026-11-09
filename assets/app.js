@@ -103,13 +103,6 @@
     for(const f of CAD){if(!overlaps(f[2],vis))continue;lastCadVisible++;featurePath(f)}
     ctx.strokeStyle=zoom < .075?'rgba(35,69,86,.42)':'rgba(27,61,75,.65)';
     ctx.lineWidth=zoom>.7?1.08:.78;ctx.stroke();
-    if(byId('labels-toggle').checked && !byId('landuse-toggle').checked && zoom > .55 && lastCadVisible < 175){
-      ctx.font='10px system-ui, sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';
-      for(const f of CAD){if(!overlaps(f[2],vis) || f===selected)continue;
-        const b=f[2],px=xPix((b[0]+b[2])/2),py=yPix((b[1]+b[3])/2);
-        if(px>=0&&px<w&&py>=0&&py<h){ctx.fillStyle='rgba(250,253,253,.8)';const tw=Math.min(75,ctx.measureText(f[0]).width+9);ctx.fillRect(px-tw/2,py-7,tw,14);ctx.fillStyle='#365666';ctx.fillText(f[0],px,py,75)}
-      }
-    }
     ctx.restore();
   }
   function highlightFeature(f,isHover){
@@ -242,7 +235,6 @@
       if(mode.value==='west')fit(sheets[0].b);else if(mode.value==='east')fit(sheets[1].b);else fit(total);
     });
     toggler.addEventListener('change',requestDraw);
-    byId('labels-toggle').addEventListener('change',requestDraw);
     satelliteToggle.addEventListener('change',()=>{
       // Contour pixels already contain transparency: keep full color contrast.
       // The opacity slider stays user-controlled in both modes.
@@ -276,6 +268,8 @@
       if(drag){const dx=e.clientX-drag.x,dy=e.clientY-drag.y;if(Math.abs(dx)+Math.abs(dy)>4)wasDragged=true;
         cx=drag.cx-dx/zoom;cy=drag.cy+dy/zoom;requestDraw();return;
       }
+      // The land-use popup has priority over the old CAD hover layer.
+      if(byId('landuse-toggle')?.checked){if(hovered){hovered=null;requestDraw()}return}
       if(!toggler.checked){if(hovered){hovered=null;tooltip.hidden=true;requestDraw()}return}
       const next=pickMap(xMap(px),yMap(py));if(next!==hovered){hovered=next;requestDraw()}
       // The land-use layer owns the hover popup while enabled.
@@ -284,7 +278,7 @@
     pane.addEventListener('pointerup',e=>{
       if(!drag)return;pane.classList.remove('dragging');
       const rect=canvas.getBoundingClientRect(),px=e.clientX-rect.left,py=e.clientY-rect.top;
-      if(!wasDragged&&toggler.checked)selectFeature(pickMap(xMap(px),yMap(py)),false);
+      if(!wasDragged&&toggler.checked&&!byId('landuse-toggle')?.checked)selectFeature(pickMap(xMap(px),yMap(py)),false);
       drag=null;
     });
     pane.addEventListener('pointercancel',()=>{drag=null;pane.classList.remove('dragging')});

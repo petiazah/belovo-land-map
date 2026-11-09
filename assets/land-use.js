@@ -11,25 +11,18 @@
     '#8b7618','#168d97','#bd617e','#567522','#7e588c','#2877be'
   ];
   const elem = id => document.getElementById(id);
-  const toggle = elem('landuse-toggle'), labelsToggle = elem('labels-toggle');
+  const toggle = elem('landuse-toggle');
   const ownerSelect = elem('owner-select'), massSelect = elem('mass-select');
   const status = elem('landuse-status'), detail = elem('mass-detail');
   const tooltip = elem('map-tooltip'), pane = elem('map-pane'), canvas = elem('map-canvas');
   const fmt = x => Number(x).toLocaleString('bg-BG',{maximumFractionDigits:2});
   const clean = s => String(s).replace(/"/g,'').trim();
   let owners = [], masses = [], ready = false, hovered = null, hoveredFeature = null, selected = null, selectedParcel = null, filter = -1;
-  const labelAnchorCache = new WeakMap();
   let hitGeometry = [], missing = 0, matchCount = 0;
   let lastView = null, down = null;
   const byId = new Map(), byCad = new Map();
 
   const intersects = (a,b) => a && a[2]>=b[0] && a[0]<=b[2] && a[3]>=b[1] && a[1]<=b[3];
-  function shortName(name) {
-    const text = clean(name).replace(/ ЕООД$/,'');
-    if (name.includes('ЕООД') || text.split(' ').length < 3) return text;
-    const words = text.split(/\s+/);
-    return words[0] + ' ' + words[words.length-1];
-  }
   function mergeBounds(bounds,addition) {
     if (!bounds) return [...addition];
     return [Math.min(bounds[0],addition[0]),Math.min(bounds[1],addition[1]),
@@ -71,13 +64,14 @@
     if (!entry) return;
     const m=entry.mass, f=entry.feature;
     const name=clean(owners[m.ownerIndex]);
-    tooltip.innerHTML = '<strong>Имот № '+escapeHTML(f[0])+'</strong>'+ 
-      '<div>Масив № '+m.id+'</div><div>'+escapeHTML(name)+'</div>'+ 
-      '<div>Площ на масива: '+fmt(m.area)+' дка</div>'+ 
-      '<div>CAD площ на имота: '+fmt(f[1])+' дка</div>'+ 
-      '<small>Имотът е по архивната CAD основа (2016 г.)</small>';
+    tooltip.innerHTML = '<strong>Масив № '+m.id+'</strong>'+
+      '<div><b>Ползвател:</b> '+escapeHTML(name)+'</div>'+
+      '<div><b>Площ на масива:</b> '+fmt(m.area)+' дка</div>'+
+      '<div><b>Имот по CAD 2016:</b> № '+escapeHTML(f[0])+'</div>'+
+      '<div><b>Площ на имота по CAD:</b> '+fmt(f[1])+' дка</div>'+
+      '<small>Ориентировъчно очертание върху кадастрална основа от 2016 г.</small>';
     tooltip.hidden=false;
-    const width=260,height=156;
+    const width=270,height=155;
     tooltip.style.left=(x+width+18>pane.clientWidth?Math.max(9,x-width-13):x+17)+'px';
     tooltip.style.top=(y+height+14>pane.clientHeight?Math.max(7,y-height-12):y+12)+'px';
   }
@@ -170,88 +164,6 @@
     ready=true;
     window.BELOVO_REDRAW?.();
   }
-  function label(ctx,view,m,full,boxes){
-    if(!m.center)return;
-    const x=(m.center[0]-view.cx)*view.zoom+view.w/2;
-    const y=(view.cy-m.center[1])*view.zoom+view.h/2;
-    if(x<17 || x>view.w-17 || y<18 || y>view.h-18)return;
-    const title='№'+m.id+' '+(full?clean(owners[m.ownerIndex]):shortName(owners[m.ownerIndex]));
-    ctx.font=(m===selected?'bold 12px':'600 11px')+' system-ui, sans-serif';
-    const width=Math.min(240,Math.ceil(ctx.measureText(title).width)+16);
-    const box=[x-width/2,y-12,x+width/2,y+12];
-    if(m!==selected && boxes.some(b=>!(b[2]+9<box[0] || b[0]-9>box[2] || b[3]+5<box[1] || b[1]-5>box[3])))return;
-    boxes.push(box);
-    ctx.save();
-    ctx.fillStyle=m===selected?'#fff4e2':'rgba(255,255,255,.94)';
-    ctx.strokeStyle=colors[m.ownerIndex%colors.length];
-    ctx.lineWidth=m===selected?2:1;
-    ctx.beginPath();ctx.roundRect(box[0],box[1],width,24,6);ctx.fill();ctx.stroke();
-    ctx.fillStyle='#183645';ctx.textAlign='center';ctx.textBaseline='middle';
-    ctx.fillText(title,x,y,Math.max(14,width-12));ctx.restore();
-  }
-
-  function isInsideFeature(x,y,f) {
-    let inside=false;
-    for(const ring of f[3]) if(ring.length>=3 && inRing(x,y,ring)) inside=!inside;
-    return inside;
-  }
-  function labelAnchor(f) {
-    if(labelAnchorCache.has(f))return labelAnchorCache.get(f);
-    const b=f[2],width=b[2]-b[0],height=b[3]-b[1];
-    // The bounding box center may be outside an irregular cadastral parcel.
-    // Try interior candidates before placing a text label.
-    let result=null;
-    const fractions=[.5,.4,.6,.3,.7,.2,.8,.1,.9];
-    for(const fy of fractions){
-      for(const fx of fractions){
-        const x=b[0]+fx*width,y=b[1]+fy*height;
-        if(isInsideFeature(x,y,f)){result=[x,y];break;}
-      }
-      if(result)break;
-    }
-    labelAnchorCache.set(f,result);
-    return result;
-  }
-  function parcelLabels(ctx,view,visible,usedBoxes) {
-    if(!labelsToggle.checked || view.zoom<.48)return;
-    const eligible=hitGeometry.filter(({feature:f,mass:m})=>
-      matchesFilter(m)&&intersects(f[2],visible));
-    eligible.sort((a,b)=>
-      (b.feature===selectedParcel)-(a.feature===selectedParcel) ||
-      Number(b.feature[1])-Number(a.feature[1]));
-    const maxLabels=view.zoom<.9?90:view.zoom<1.7?150:260;
-    let placed=0;
-    ctx.save();
-    ctx.textAlign='center';ctx.textBaseline='middle';
-    for(const entry of eligible) {
-      if(placed>=maxLabels)break;
-      const f=entry.feature,m=entry.mass;
-      const b=f[2];
-      const sw=(b[2]-b[0])*view.zoom, sh=(b[3]-b[1])*view.zoom;
-      if(f!==selectedParcel && Math.max(sw,sh)<23)continue;
-      const pt=labelAnchor(f);
-      if(!pt)continue;
-      const x=(pt[0]-view.cx)*view.zoom+view.w/2;
-      const y=(view.cy-pt[1])*view.zoom+view.h/2;
-      if(x<18||x>view.w-18||y<12||y>view.h-12)continue;
-      const title='Имот '+String(f[0]);
-      ctx.font=(f===selectedParcel?'bold 11px':'600 10px')+' system-ui, sans-serif';
-      const width=Math.min(140,Math.ceil(ctx.measureText(title).width)+12);
-      const box=[x-width/2,y-9,x+width/2,y+9];
-      if(f!==selectedParcel &&
-        usedBoxes.some(a=>!(a[2]+3<box[0]||a[0]-3>box[2]||a[3]+3<box[1]||a[1]-3>box[3])))continue;
-      usedBoxes.push(box);
-      ctx.fillStyle=f===selectedParcel?'#fff0d9':'rgba(255,255,255,.83)';
-      ctx.strokeStyle=colors[m.ownerIndex%colors.length];
-      ctx.lineWidth=f===selectedParcel?1.6:.7;
-      ctx.beginPath();ctx.roundRect(box[0],box[1],width,18,4);
-      ctx.fill();ctx.stroke();
-      ctx.fillStyle='#153648';
-      ctx.fillText(title,x,y,Math.max(16,width-8));
-      placed++;
-    }
-    ctx.restore();
-  }
   function draw(ctx,view,redraw) {
     window.BELOVO_REDRAW=redraw;
     lastView=view;
@@ -276,22 +188,6 @@
     }
     ctx.restore();
 
-    // General view: a few prominent labels per user to avoid hundreds of overlapping tags.
-    const focus=visibleMasses.slice().sort((a,b)=>{
-      if(a===selected)return -1;if(b===selected)return 1;
-      return b.area-a.area;
-    });
-    const boxes=[],counts=new Map();
-    if(selected && visibleMasses.includes(selected))label(ctx,view,selected,true,boxes);
-    const compact=view.zoom<.22 && filter===-1;
-    for(const m of focus){
-      if(m===selected || !m.center)continue;
-      const n=counts.get(m.ownerIndex)||0;
-      if(compact && n>=3)continue;
-      if(compact)counts.set(m.ownerIndex,n+1);
-      label(ctx,view,m,!compact||filter!==-1,boxes);
-    }
-    parcelLabels(ctx,view,visible,boxes);
   }
   function pointerCoord(event) {
     if(!lastView)return null;
@@ -324,7 +220,6 @@
     if(hovered||hoveredFeature){hovered=null;hoveredFeature=null;window.BELOVO_REDRAW?.();}
   });
   toggle.addEventListener('change',()=>{hovered=null;hoveredFeature=null;tooltip.hidden=true;window.BELOVO_REDRAW?.();});
-  labelsToggle.addEventListener('change',()=>window.BELOVO_REDRAW?.());
   ownerSelect.addEventListener('change',()=>{
     filter=Number(ownerSelect.value);
     selected=null;refreshMassOptions();choose(null,false);

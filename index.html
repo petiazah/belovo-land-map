@@ -38,9 +38,9 @@
           <label class="field-label" for="sheet-select">Работна карта 2026/2027</label>
           <select id="sheet-select"><option value="both">Обединена карта 1 + карта 2</option><option value="west">Карта 1 · западна част</option><option value="east">Карта 2 · източна част</option></select>
           <label class="toggle-row"><input type="checkbox" id="satellite-toggle"><span class="switch" aria-hidden="true"></span><span class="toggle-text"><b>Сателитна подложка</b><small>Esri World Imagery · работните карти се показват без бял фон</small></span></label>
-          <label class="toggle-row"><input type="checkbox" id="landuse-toggle" checked><span class="switch" aria-hidden="true"></span><span class="toggle-text"><b>Ползватели по споразумението</b><small>2026/2027 · надписи и цветни контури</small></span></label>
+          <label class="toggle-row"><input type="checkbox" id="landuse-toggle" checked><span class="switch" aria-hidden="true"></span><span class="toggle-text"><b>Ползватели по споразумението</b><small>2026/2027 · цветни контури и информация при посочване</small></span></label>
           <label class="toggle-row"><input type="checkbox" id="cad-toggle"><span class="switch" aria-hidden="true"></span><span class="toggle-text"><b>Кадастрални контури</b><small>Справочен CAD слой · 2016 г.</small></span></label>
-          <label class="toggle-row" id="labels-row"><input type="checkbox" id="labels-toggle" checked><span class="switch" aria-hidden="true"></span><span class="toggle-text"><b>Номера на имотите</b><small>При приближаване · справочен CAD 2016</small></span></label>
+          <p class="helper-text">Посочи оцветен имот на картата, за да видиш номер на масив, ползвател, площ и номер на имота (CAD 2016). Щракни за подробности.</p>
           <label class="field-label range-label" for="opacity-range">Прозрачност на работните карти <output id="opacity-label">100%</output></label>
           <input type="range" id="opacity-range" min="15" max="100" value="100" step="5" aria-label="Плътност на растерните карти">
           <div class="chip-row"><button type="button" id="fit-maps" class="btn btn-primary">Обхват на картите</button><button type="button" id="fit-cad" class="btn btn-secondary">Цяло землище</button></div>
