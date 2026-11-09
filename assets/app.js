@@ -15,6 +15,7 @@
   const canvas = byId('map-canvas'), pane = byId('map-pane'), ctx = canvas.getContext('2d', {alpha:false});
   const toggler = byId('cad-toggle'), mode = byId('sheet-select'), opacity = byId('opacity-range');
   const satelliteToggle = byId('satellite-toggle'), satellite = window.BELOVO_SATELLITE;
+  const pdfOverlayToggle = byId('pdf-overlay-toggle');
   const search = byId('parcel-search'), suggestions = byId('suggestions'), tooltip = byId('map-tooltip');
   const detail = byId('detail-card'), status = byId('map-status'), loading = byId('loading-overlay');
   const fmt = n => Number(n).toLocaleString('bg-BG',{maximumFractionDigits:2});
@@ -128,14 +129,24 @@
     ctx.setTransform(dpr,0,0,dpr,0,0);ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';
     drawGrid();
     if(satelliteToggle.checked && satellite) satellite.draw(ctx,{cx,cy,zoom,w,h},requestDraw);
-    if(mode.value==='both'){drawSheet(sheets[0],sheets[0].b[0],seam);drawSheet(sheets[1],seam,sheets[1].b[2]);}
-    else {const sheet=sheets.find(s=>s.id===mode.value);if(sheet)drawSheet(sheet,sheet.b[0],sheet.b[2]);}
+    // PDF raster contains embedded place labels. For a genuinely text-free view,
+    // hide that raster entirely while keeping independently drawn cadastral/user outlines.
+    // Do NOT infer new 2026/2027 massif boundaries from the historic CAD outlines.
+    if(pdfOverlayToggle.checked){
+      if(mode.value==='both'){drawSheet(sheets[0],sheets[0].b[0],seam);drawSheet(sheets[1],seam,sheets[1].b[2]);}
+      else {const sheet=sheets.find(s=>s.id===mode.value);if(sheet)drawSheet(sheet,sheet.b[0],sheet.b[2]);}
+    }
     drawCAD();
     if(window.BELOVO_LAND_USE) window.BELOVO_LAND_USE.draw(ctx,{cx,cy,zoom,w,h},requestDraw);
     if(hovered && hovered!==selected && toggler.checked)highlightFeature(hovered,true);
     if(selected && toggler.checked)highlightFeature(selected,false);
     updateScale();
-    if(ready){status.textContent=toggler.checked?`${fmt(lastCadVisible)} контура в изгледа · CAD 2016`:'Работни карти 2026/2027';status.classList.add('ready')}
+    if(ready){
+      status.textContent=pdfOverlayToggle.checked
+        ? (toggler.checked?`${fmt(lastCadVisible)} контура в изгледа · CAD 2016`:'Работни карти 2026/2027')
+        : 'Без PDF надписи · контури по CAD 2016 / регистър 2026/2027';
+      status.classList.add('ready');
+    }
   }
   function insideRing(x,y,ring){
     let inside=false;
@@ -199,6 +210,7 @@
     const p=new URLSearchParams();p.set('x',Math.round(cx));p.set('y',Math.round(cy));p.set('s',zoom.toFixed(4));
     p.set('sheet',mode.value);p.set('cad',toggler.checked?'1':'0');p.set('opacity',opacity.value);
     p.set('satellite',satelliteToggle.checked?'1':'0');
+    p.set('pdf',pdfOverlayToggle.checked?'1':'0');
     if(selected)p.set('parcel',selected[0]);return p.toString();
   }
   function restore(){
@@ -207,7 +219,10 @@
       const x=Number(p.get('x')),y=Number(p.get('y')),z=Number(p.get('s'));
       if(Number.isFinite(x)&&Number.isFinite(y)&&Number.isFinite(z)&&z>=minZoom&&z<=maxZoom){cx=x;cy=y;zoom=z}else return false;
       const m=p.get('sheet');if(['both','west','east'].includes(m))mode.value=m;
-      toggler.checked=p.get('cad')==='1';satelliteToggle.checked=p.get('satellite')==='1';const a=Number(p.get('opacity'));if(a>=15&&a<=100)opacity.value=a;
+      toggler.checked=p.get('cad')==='1';satelliteToggle.checked=p.get('satellite')==='1';
+      pdfOverlayToggle.checked=p.has('pdf') ? p.get('pdf')==='1' : !satelliteToggle.checked;
+      syncPdfOverlayUI();
+      const a=Number(p.get('opacity'));if(a>=15&&a<=100)opacity.value=a;
 
       byId('opacity-label').textContent=opacity.value+'%';
       const id=p.get('parcel');if(id){const f=CAD.find(c=>c[0]===id);if(f)selectFeature(f,false)}
@@ -225,6 +240,19 @@
     catch{showToast('Неуспешен експорт. Опитайте отново след зареждане.');}
   }
   function closeMobile(){byId('app-body').classList.remove('sidebar-open');byId('mobile-menu').setAttribute('aria-expanded','false')}
+  function syncPdfOverlayUI(){
+    opacity.disabled=!pdfOverlayToggle.checked;
+    byId('pdf-overlay-row').title=pdfOverlayToggle.checked
+      ? 'Включени са оригиналните PDF листове, които съдържат надписи'
+      : 'Печатните надписи са скрити, защото PDF листовете не се рисуват';
+    byId('map-attribution').textContent=satelliteToggle.checked
+      ? (pdfOverlayToggle.checked
+        ? 'Esri World Imagery · Esri, Vantor, Earthstar Geographics, GIS User Community · PDF листове 2026/2027 (с текст) · CAD 2016'
+        : 'Esri World Imagery · Esri, Vantor, Earthstar Geographics, GIS User Community · векторни CAD контури 2016 / ползватели 2026/2027')
+      : (pdfOverlayToggle.checked
+        ? 'PDF листове: 2026/2027 · CAD: 2016 · справочен преглед'
+        : 'Само векторни контури по CAD 2016 · ползватели от регистър 2026/2027');
+  }
   function initControls(){
     byId('fit-maps').addEventListener('click',()=>fit(total));
     byId('fit-cad').addEventListener('click',()=>{toggler.checked=true;fit(fullCAD)});
@@ -236,9 +264,14 @@
     });
     toggler.addEventListener('change',requestDraw);
     satelliteToggle.addEventListener('change',()=>{
-      // Contour pixels already contain transparency: keep full color contrast.
-      // The opacity slider stays user-controlled in both modes.
-      byId('map-attribution').textContent=satelliteToggle.checked?'Esri World Imagery · Esri, Vantor, Earthstar Geographics, GIS User Community · PDF контури 2026/2027 · CAD 2016':'PDF: 2026/2027 · CAD: 2016 · справочен преглед';
+      // Default to a clean vector-only overlay on satellite. PDF can be restored
+      // explicitly with the independent "Оригинални PDF карти" switch.
+      pdfOverlayToggle.checked=!satelliteToggle.checked;
+      syncPdfOverlayUI();
+      requestDraw();
+    });
+    pdfOverlayToggle.addEventListener('change',()=>{
+      syncPdfOverlayUI();
       requestDraw();
     });
     opacity.addEventListener('input',()=>{byId('opacity-label').textContent=opacity.value+'%';requestDraw()});
@@ -314,7 +347,7 @@
   window.BELOVO_FIT = fit;
   window.BELOVO_REDRAW = requestDraw;
   initControls();initPointer();resize();if(!restore())fit(total);
-  if(satelliteToggle.checked)byId('map-attribution').textContent='Esri World Imagery · Esri, Vantor, Earthstar Geographics, GIS User Community · PDF контури 2026/2027 · CAD 2016';
+  syncPdfOverlayUI();
   initImages();
   window.addEventListener('resize',resize);if(window.ResizeObserver)new ResizeObserver(resize).observe(pane);
 })();
