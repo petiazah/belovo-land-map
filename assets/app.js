@@ -14,6 +14,8 @@
   const byId = id => document.getElementById(id);
   const canvas = byId('map-canvas'), pane = byId('map-pane'), ctx = canvas.getContext('2d', {alpha:false});
   const toggler = byId('cad-toggle'), mode = byId('sheet-select'), opacity = byId('opacity-range');
+  const satelliteToggle = byId('satellite-toggle'), satellite = window.BELOVO_SATELLITE;
+  let opacityBeforeSatellite = null;
   const search = byId('parcel-search'), suggestions = byId('suggestions'), tooltip = byId('map-tooltip');
   const detail = byId('detail-card'), status = byId('map-status'), loading = byId('loading-overlay');
   const fmt = n => Number(n).toLocaleString('bg-BG',{maximumFractionDigits:2});
@@ -130,6 +132,7 @@
     if(!ctx)return;
     ctx.setTransform(dpr,0,0,dpr,0,0);ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';
     drawGrid();
+    if(satelliteToggle.checked && satellite) satellite.draw(ctx,{cx,cy,zoom,w,h},requestDraw);
     if(mode.value==='both'){drawSheet(sheets[0],sheets[0].b[0],seam);drawSheet(sheets[1],seam,sheets[1].b[2]);}
     else {const sheet=sheets.find(s=>s.id===mode.value);if(sheet)drawSheet(sheet,sheet.b[0],sheet.b[2]);}
     drawCAD();
@@ -199,6 +202,7 @@
   function serialize(){
     const p=new URLSearchParams();p.set('x',Math.round(cx));p.set('y',Math.round(cy));p.set('s',zoom.toFixed(4));
     p.set('sheet',mode.value);p.set('cad',toggler.checked?'1':'0');p.set('opacity',opacity.value);
+    p.set('satellite',satelliteToggle.checked?'1':'0');
     if(selected)p.set('parcel',selected[0]);return p.toString();
   }
   function restore(){
@@ -207,7 +211,8 @@
       const x=Number(p.get('x')),y=Number(p.get('y')),z=Number(p.get('s'));
       if(Number.isFinite(x)&&Number.isFinite(y)&&Number.isFinite(z)&&z>=minZoom&&z<=maxZoom){cx=x;cy=y;zoom=z}else return false;
       const m=p.get('sheet');if(['both','west','east'].includes(m))mode.value=m;
-      toggler.checked=p.get('cad')==='1';const a=Number(p.get('opacity'));if(a>=15&&a<=100)opacity.value=a;
+      toggler.checked=p.get('cad')==='1';satelliteToggle.checked=p.get('satellite')==='1';const a=Number(p.get('opacity'));if(a>=15&&a<=100)opacity.value=a;
+      if(satelliteToggle.checked&&Number(opacity.value)>75){opacityBeforeSatellite=Number(opacity.value);opacity.value='60';}
       byId('opacity-label').textContent=opacity.value+'%';
       const id=p.get('parcel');if(id){const f=CAD.find(c=>c[0]===id);if(f)selectFeature(f,false)}
       return true;
@@ -234,7 +239,14 @@
       if(mode.value==='west')fit(sheets[0].b);else if(mode.value==='east')fit(sheets[1].b);else fit(total);
     });
     toggler.addEventListener('change',requestDraw);
-    opacity.addEventListener('input',()=>{byId('opacity-label').textContent=opacity.value+'%';requestDraw()});
+    satelliteToggle.addEventListener('change',()=>{
+      if(satelliteToggle.checked){if(Number(opacity.value)>75){opacityBeforeSatellite=Number(opacity.value);opacity.value='60';}}
+      else if(opacityBeforeSatellite!==null){opacity.value=String(opacityBeforeSatellite);opacityBeforeSatellite=null;}
+      byId('opacity-label').textContent=opacity.value+'%';
+      byId('map-attribution').textContent=satelliteToggle.checked?'Esri World Imagery · Esri, Vantor, Earthstar Geographics, GIS User Community · PDF 2026/2027 · CAD 2016':'PDF: 2026/2027 · CAD: 2016 · справочен преглед';
+      requestDraw();
+    });
+    opacity.addEventListener('input',()=>{opacityBeforeSatellite=null;byId('opacity-label').textContent=opacity.value+'%';requestDraw()});
     search.addEventListener('input',updateSuggestions);
     search.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();findFeature()}else if(e.key==='Escape')suggestions.hidden=true});
     byId('search-button').addEventListener('click',findFeature);
@@ -292,6 +304,8 @@
       img.addEventListener('load',()=>done(true),{once:true});img.addEventListener('error',()=>done(false),{once:true});img.src=tile.src;
     }
   }
-  initControls();initPointer();resize();if(!restore())fit(total);initImages();
+  initControls();initPointer();resize();if(!restore())fit(total);
+  if(satelliteToggle.checked)byId('map-attribution').textContent='Esri World Imagery · Esri, Vantor, Earthstar Geographics, GIS User Community · PDF 2026/2027 · CAD 2016';
+  initImages();
   window.addEventListener('resize',resize);if(window.ResizeObserver)new ResizeObserver(resize).observe(pane);
 })();
